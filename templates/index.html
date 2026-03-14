@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Password Strength Analyzer</title>
+
+<style>
+    body {
+        margin: 0;
+        height: 100vh;
+        font-family: "Segoe UI", sans-serif;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+    }
+
+    .card {
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(15px);
+        padding: 30px;
+        width: 430px;
+        border-radius: 20px;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+    }
+
+    h2 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    input {
+        width: 100%;
+        padding: 14px;
+        border-radius: 12px;
+        border: none;
+        font-size: 16px;
+        outline: none;
+        margin-bottom: 12px;
+    }
+
+    .bar {
+        height: 8px;
+        width: 100%;
+        background: #ccc;
+        border-radius: 10px;
+        margin: 15px 0;
+        overflow: hidden;
+    }
+
+    .fill {
+        height: 100%;
+        width: 0%;
+        transition: 0.4s;
+    }
+
+    .box {
+        background: rgba(0,0,0,0.25);
+        padding: 12px;
+        border-radius: 10px;
+        margin-top: 10px;
+        font-size: 14px;
+    }
+
+    ul {
+        padding-left: 18px;
+        margin: 5px 0;
+    }
+
+    .safe { color: #7CFF6B; }
+    .danger { color: #FF6B6B; }
+
+</style>
+</head>
+
+<body>
+
+<div class="card">
+    <h2>🔐 Password Security Tool</h2>
+
+    <input type="password"
+           id="password"
+           placeholder="Type your password..."
+           oninput="liveCheck()">
+
+    <div class="bar">
+        <div id="strengthBar" class="fill"></div>
+    </div>
+
+    <div id="result"></div>
+</div>
+
+<script>
+let typingTimer = null;
+
+function liveCheck() {
+    clearTimeout(typingTimer);
+
+    typingTimer = setTimeout(() => {
+        let password = document.getElementById("password").value;
+
+        if (password.length === 0) {
+            document.getElementById("strengthBar").style.width = "0%";
+            document.getElementById("result").innerHTML = "";
+            return;
+        }
+
+        fetch("/check_password", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: "password=" + encodeURIComponent(password)
+        })
+        .then(res => res.json())
+        .then(data => updateUI(data));
+    }, 300);
+}
+
+function updateUI(data) {
+    let bar = document.getElementById("strengthBar");
+    let color, width;
+
+    if (data.strength === "Weak") {
+        color = "#FF6B6B";
+        width = "30%";
+    } else if (data.strength === "Medium") {
+        color = "#FFD93D";
+        width = "65%";
+    } else {
+        color = "#7CFF6B";
+        width = "100%";
+    }
+
+    bar.style.background = color;
+    bar.style.width = width;
+
+    let breachClass = data.breach.includes("Breached") ? "danger" : "safe";
+
+    let suggestionsHTML = "<ul>";
+    data.suggestions.forEach(s => {
+        suggestionsHTML += `<li>${s}</li>`;
+    });
+    suggestionsHTML += "</ul>";
+
+    document.getElementById("result").innerHTML = `
+        <div class="box">
+            <b>Strength:</b> ${data.strength}<br>
+            <b>Score:</b> ${data.score}<br>
+            <b>Entropy:</b> ${data.entropy} bits
+        </div>
+
+        <div class="box ${breachClass}">
+            <b>Breach Status:</b> ${data.breach}
+        </div>
+
+        <div class="box">
+            <b>SHA-256:</b> ${data.sha256}<br>
+            <b>bcrypt:</b> ${data.bcrypt}
+        </div>
+
+        <div class="box">
+            <b>Suggestions:</b>
+            ${suggestionsHTML}
+        </div>
+    `;
+}
+</script>
+
+</body>
+</html>
